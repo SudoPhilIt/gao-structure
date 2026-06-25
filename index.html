@@ -152,6 +152,17 @@ function savePNG() {
   document.body.removeChild(a);
 }
 
+function captureFrames(nFrames, degStep, msPerFrame, onDone) {
+  const uris = []; let f = 0;
+  function next() {
+    if (f >= nFrames) { onDone(uris); return; }
+    document.getElementById('status').textContent = `capturing frame ${f+1}/${nFrames}…`;
+    viewer.rotate(degStep, 'y'); viewer.render();
+    setTimeout(() => { uris.push(viewer.pngURI()); f++; next(); }, msPerFrame);
+  }
+  next();
+}
+
 function startGIF() {
   if (!viewer) return;
   const wasSpinning = spinning; spinning = false;
@@ -160,71 +171,65 @@ function startGIF() {
   btn.disabled = true;
   document.getElementById('rec').style.display = 'block';
 
-  const frames = 36, delay = 80;
-  const uris = [];
-  let f = 0;
-
-  function capture() {
-    if (f >= frames) {
-      status.textContent = 'encoding GIF…';
-      gifshot.createGIF({
-        images: uris,
-        gifWidth: 600,
-        gifHeight: 500,
-        interval: delay / 1000,
-        numWorkers: 2,
-      }, result => {
-        document.getElementById('rec').style.display = 'none';
-        btn.disabled = false;
-        spinning = wasSpinning; if (wasSpinning) doSpin();
-        if (result.error) {
-          status.textContent = 'GIF error: ' + result.errorCode;
-          return;
-        }
-        status.textContent = '';
-        const a = document.createElement('a');
-        a.href = result.image;
-        a.download = 'GAO_1GOG_360.gif';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      });
-      return;
-    }
-    status.textContent = `capturing frame ${f+1}/${frames}…`;
-    viewer.rotate(360/frames, 'y'); viewer.render();
-    setTimeout(() => { uris.push(viewer.pngURI()); f++; capture(); }, 80);
-  }
-  capture();
+  captureFrames(36, 10, 80, uris => {
+    status.textContent = 'encoding GIF…';
+    gifshot.createGIF({
+      images: uris,
+      gifWidth: 600,
+      gifHeight: 500,
+      interval: 0.08,
+      numWorkers: 2,
+    }, result => {
+      document.getElementById('rec').style.display = 'none';
+      btn.disabled = false;
+      spinning = wasSpinning; if (wasSpinning) doSpin();
+      if (result.error) { status.textContent = 'GIF error: ' + result.errorCode; return; }
+      status.textContent = '';
+      const a = document.createElement('a');
+      a.href = result.image; a.download = 'GAO_1GOG_360.gif';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
+  });
 }
 
 function startVideo() {
   if (!viewer) return;
-  const canvas = document.getElementById('viewer').querySelector('canvas');
-  if (!canvas || !canvas.captureStream) { document.getElementById('status').textContent = 'Not supported in this browser.'; return; }
   const wasSpinning = spinning; spinning = false;
   const btn = document.getElementById('vidBtn');
   const status = document.getElementById('status');
-  btn.disabled = true; status.textContent = 'recording 5s…';
+  btn.disabled = true;
   document.getElementById('rec').style.display = 'block';
 
-  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-  const rec = new MediaRecorder(canvas.captureStream(30), {mimeType: mime});
-  const chunks = [];
-  rec.ondataavailable = e => chunks.push(e.data);
-  rec.onstop = () => {
-    document.getElementById('rec').style.display = 'none';
-    btn.disabled = false; status.textContent = '';
-    spinning = wasSpinning; if (wasSpinning) doSpin();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(chunks, {type: mime}));
-    a.download = 'GAO_1GOG.webm';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-  rec.start();
-  let t = 0;
-  const loop = setInterval(() => {
-    viewer.rotate(2, 'y'); viewer.render(); t += 1000/30;
-    if (t >= 5000) { clearInterval(loop); rec.stop(); }
-  }, 1000/30);
+  const fps = 25, totalFrames = 5 * fps;
+  captureFrames(totalFrames, 360 / totalFrames, 1000 / fps, uris => {
+    status.textContent = 'encoding video…';
+    const W = 600, H = 500;
+    const proxy = document.createElement('canvas');
+    proxy.width = W; proxy.height = H;
+    const ctx = proxy.getContext('2d');
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    const rec = new MediaRecorder(proxy.captureStream(fps), {mimeType: mime});
+    const chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => {
+      document.getElementById('rec').style.display = 'none';
+      btn.disabled = false; status.textContent = '';
+      spinning = wasSpinning; if (wasSpinning) doSpin();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(chunks, {type: mime}));
+      a.download = 'GAO_1GOG.webm';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+    rec.start();
+    let i = 0;
+    function paintFrame() {
+      if (i >= uris.length) { rec.stop(); return; }
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, W, H); i++; setTimeout(paintFrame, 1000/fps); };
+      img.src = uris[i];
+    }
+    paintFrame();
+  });
 }
 
 fetch('1gog_backbone.pdb')
