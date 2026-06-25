@@ -169,9 +169,20 @@ function showOutput(hint, html) {
 }
 
 function captureFrames(nFrames, degStep, msPerFrame, onDone) {
+  // Force solid background during capture — transparent WebGL has premultiplied alpha artifacts
+  const wasBg = currentBg;
+  if (currentBg === 'transparent') {
+    viewer.setBackgroundColor(0x000000, 1);
+    viewer.render();
+  }
   const uris = []; let f = 0;
   function next() {
-    if (f >= nFrames) { onDone(uris); return; }
+    if (f >= nFrames) {
+      // Restore background
+      if (wasBg === 'transparent') { viewer.setBackgroundColor(0x000000, 0); viewer.render(); }
+      onDone(uris);
+      return;
+    }
     document.getElementById('status').textContent = `capturing frame ${f+1}/${nFrames}…`;
     viewer.rotate(degStep, 'y'); viewer.render();
     setTimeout(() => { uris.push(viewer.pngURI()); f++; next(); }, msPerFrame);
