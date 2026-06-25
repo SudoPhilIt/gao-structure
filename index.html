@@ -16,7 +16,8 @@
   .dot.round { border-radius: 50%; }
   #viewer { width: 100%; flex: 1; min-height: calc(100vh - 140px); position: relative; background: #000; }
   #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #666; font-size: 13px; text-align: center; }
-  .toolbar { padding: 10px 16px; background: #1a1a1a; border-top: 1px solid #2a2a2a; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar { padding: 8px 16px; background: #1a1a1a; border-top: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 6px; }
+  .toolbar-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .toolbar-group { display: flex; gap: 6px; align-items: center; }
   .toolbar-label { font-size: 11px; color: #666; margin-right: 2px; }
   button { font-size: 12px; padding: 5px 13px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
@@ -48,40 +49,43 @@
 </div>
 
 <div class="toolbar">
-  <div class="toolbar-group">
-    <span class="toolbar-label">enzyme</span>
-    <select id="enzymeSelect" onchange="loadEnzyme(this.value)">
-      <option value="gao">Galactose oxidase (1GOG)</option>
-      <option value="gox">Glucose oxidase (1CF3)</option>
-      <option value="hrp">HRP C1A (1ATJ)</option>
-    </select>
+  <div class="toolbar-row">
+    <div class="toolbar-group">
+      <span class="toolbar-label">enzyme</span>
+      <select id="enzymeSelect" onchange="loadEnzyme(this.value)">
+        <option value="gao">Galactose oxidase (1GOG)</option>
+        <option value="gox">Glucose oxidase (1CF3)</option>
+        <option value="hrp">HRP C1A (1ATJ)</option>
+      </select>
+    </div>
   </div>
-  <div class="sep"></div>
-  <div class="toolbar-group">
-    <span class="toolbar-label">style</span>
-    <button id="btnRibbon" class="active" onclick="setStyle('cartoon')">ribbon</button>
-    <button id="btnWire" onclick="setStyle('line')">wireframe</button>
+  <div class="toolbar-row">
+    <div class="toolbar-group">
+      <span class="toolbar-label">style</span>
+      <button id="btnRibbon" class="active" onclick="setStyle('cartoon')">ribbon</button>
+      <button id="btnWire" onclick="setStyle('line')">wireframe</button>
+    </div>
+    <div class="sep"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">bg</span>
+      <button id="bgBlack" class="active" onclick="setBg('black')">black</button>
+      <button id="bgWhite" onclick="setBg('white')">white</button>
+      <button id="bgTransp" onclick="setBg('transparent')">transparent</button>
+    </div>
+    <div class="sep"></div>
+    <div class="toolbar-group">
+      <button onclick="toggleSpin()" id="spinBtn">spin: off</button>
+      <button onclick="resetView()">reset</button>
+    </div>
+    <div class="sep"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">export</span>
+      <button onclick="copyPNG()">copy PNG</button>
+      <button onclick="savePNG()">save PNG</button>
+      <button onclick="startVideo()" id="vidBtn">save video (5s)</button>
+    </div>
+    <span id="status"></span>
   </div>
-  <div class="sep"></div>
-  <div class="toolbar-group">
-    <span class="toolbar-label">bg</span>
-    <button id="bgBlack" class="active" onclick="setBg('black')">black</button>
-    <button id="bgWhite" onclick="setBg('white')">white</button>
-    <button id="bgTransp" onclick="setBg('transparent')">transparent</button>
-  </div>
-  <div class="sep"></div>
-  <div class="toolbar-group">
-    <button onclick="toggleSpin()" id="spinBtn">spin: off</button>
-    <button onclick="resetView()">reset</button>
-  </div>
-  <div class="sep"></div>
-  <div class="toolbar-group">
-    <span class="toolbar-label">export</span>
-    <button onclick="copyPNG()">copy PNG</button>
-    <button onclick="savePNG()">save PNG</button>
-    <button onclick="startVideo()" id="vidBtn">save video (5s)</button>
-  </div>
-  <span id="status"></span>
 </div>
 
 <div id="output">
