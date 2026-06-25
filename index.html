@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAO-mut321 · 3D Structure Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #111; color: #ddd; min-height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 14px 20px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 15px; font-weight: 500; color: #fff; }
+  header p { font-size: 12px; color: #888; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #999; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+  .dot.round { border-radius: 50%; }
+  #viewer { width: 100%; flex: 1; min-height: calc(100vh - 130px); position: relative; background: #000; }
+  #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #666; font-size: 13px; }
+  .toolbar { padding: 10px 16px; background: #1a1a1a; border-top: 1px solid #2a2a2a; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar-group { display: flex; gap: 6px; align-items: center; }
+  .toolbar-label { font-size: 11px; color: #666; margin-right: 2px; }
+  button { font-size: 12px; padding: 5px 13px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+  button:hover { background: #303030; color: #fff; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.active { background: #2a3a5a; border-color: #4477cc; color: #aac4ee; }
+  .sep { width: 1px; height: 20px; background: #2a2a2a; margin: 0 4px; }
+  #status { font-size: 12px; color: #888; margin-left: 8px; }
+  #rec { display: none; font-size: 11px; color: #ff4444; position: absolute; top: 12px; right: 14px; font-weight: 500; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Galactose oxidase · PDB 1GOG</h1>
+    <p>GAO-mut321 parent · Fusarium graminearum · drag to rotate · scroll to zoom</p>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="dot" style="background:#6699cc"></span>backbone</div>
+    <div class="legend-item"><span class="dot" style="background:#e84444"></span>548–605 hotspot</div>
+    <div class="legend-item"><span class="dot" style="background:#f5a623"></span>267–305 hotspot</div>
+    <div class="legend-item"><span class="dot" style="background:#44bb77"></span>430–436 hotspot</div>
+    <div class="legend-item"><span class="dot round" style="background:#aa44ff"></span>Cu²⁺</div>
+  </div>
+</header>
+
+<div id="viewer">
+  <div id="loading">Loading structure…</div>
+  <div id="rec">● recording</div>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-group">
+    <span class="toolbar-label">style</span>
+    <button id="btnRibbon" class="active" onclick="setStyle('cartoon')">ribbon</button>
+    <button id="btnWire" onclick="setStyle('line')">wireframe</button>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">bg</span>
+    <button id="bgBlack" class="active" onclick="setBg('black')">black</button>
+    <button id="bgWhite" onclick="setBg('white')">white</button>
+    <button id="bgTransp" onclick="setBg('transparent')">transparent</button>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <button onclick="toggleSpin()" id="spinBtn">spin: off</button>
+    <button onclick="resetView()">reset</button>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">export</span>
+    <button onclick="copyPNG()" id="copyBtn">copy PNG</button>
+    <button onclick="savePNG()" id="saveBtn">save PNG</button>
+    <button onclick="startGIF()" id="gifBtn">save GIF (360°)</button>
+    <button onclick="startVideo()" id="vidBtn">save video (5s)</button>
+  </div>
+  <span id="status"></span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/3dmol@2.0.3/build/3Dmol-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<script>
+let viewer, spinning = false, currentStyle = 'cartoon', currentBg = 'black';
+const r548 = [], r267 = [], r430 = [], activeSite = [228,272,290,406,495,496,531,581];
+for (let i = 548; i <= 605; i++) r548.push(i);
+for (let i = 267; i <= 305; i++) r267.push(i);
+for (let i = 430; i <= 436; i++) r430.push(i);
+
+function applyStyles() {
+  if (!viewer) return;
+  viewer.setStyle({}, {});
+  const fn = s => currentStyle === 'cartoon' ? {cartoon:{color:s}} : {line:{color:s,linewidth:1.5}};
+  viewer.setStyle({chain:'A'}, fn('#6699cc'));
+  viewer.setStyle({chain:'A',resi:r548}, fn('#e84444'));
+  viewer.setStyle({chain:'A',resi:r267}, fn('#f5a623'));
+  viewer.setStyle({chain:'A',resi:r430}, fn('#44bb77'));
+  if (currentStyle === 'cartoon') viewer.addStyle({chain:'A',resi:activeSite},{stick:{color:'#ffffff',radius:0.25}});
+  viewer.setStyle({resn:'CU'}, {sphere:{color:'#aa44ff',radius:1.4}});
+  viewer.render();
+}
+
+function setStyle(s) {
+  currentStyle = s;
+  document.getElementById('btnRibbon').classList.toggle('active', s === 'cartoon');
+  document.getElementById('btnWire').classList.toggle('active', s === 'line');
+  applyStyles();
+}
+
+function setBg(mode) {
+  currentBg = mode;
+  ['bgBlack','bgWhite','bgTransp'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(mode === 'black' ? 'bgBlack' : mode === 'white' ? 'bgWhite' : 'bgTransp').classList.add('active');
+  const el = document.getElementById('viewer');
+  if (mode === 'black') { el.style.background = '#000'; viewer && viewer.setBackgroundColor(0x000000, 1); }
+  else if (mode === 'white') { el.style.background = '#fff'; viewer && viewer.setBackgroundColor(0xffffff, 1); }
+  else { el.style.background = 'transparent'; viewer && viewer.setBackgroundColor(0x000000, 0); }
+  viewer && viewer.render();
+}
+
+function resetView() { if (viewer) { viewer.zoomTo(); viewer.render(); } }
+
+function toggleSpin() {
+  spinning = !spinning;
+  document.getElementById('spinBtn').textContent = 'spin: ' + (spinning ? 'on' : 'off');
+  if (spinning) doSpin();
+}
+function doSpin() { if (!spinning || !viewer) return; viewer.rotate(0.8, 'y'); viewer.render(); requestAnimationFrame(doSpin); }
+
+function getPNG() { viewer.render(); return viewer.pngURI(); }
+
+async function copyPNG() {
+  if (!viewer) return;
+  const status = document.getElementById('status');
+  try {
+    const res = await fetch(getPNG());
+    const blob = await res.blob();
+    await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+    status.textContent = '✓ copied — paste anywhere';
+    setTimeout(() => status.textContent = '', 3000);
+  } catch(e) {
+    status.textContent = 'Clipboard blocked — use save PNG instead';
+  }
+}
+
+function savePNG() {
+  if (!viewer) return;
+  const a = document.createElement('a');
+  a.href = getPNG();
+  a.download = 'GAO_1GOG.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function startGIF() {
+  if (!viewer) return;
+  const wasSpinning = spinning; spinning = false;
+  const btn = document.getElementById('gifBtn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  document.getElementById('rec').style.display = 'block';
+
+  const gif = new GIF({workers:2, quality:8, width:800, height:600,
+    workerScript:'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'});
+
+  const frames = 36, delay = 80; let f = 0;
+  function capture() {
+    if (f >= frames) { status.textContent = 'encoding GIF…'; gif.render(); return; }
+    status.textContent = `capturing frame ${f+1}/${frames}…`;
+    viewer.rotate(360/frames, 'y'); viewer.render();
+    setTimeout(() => {
+      const img = new Image();
+      img.onload = () => { gif.addFrame(img, {delay}); f++; capture(); };
+      img.src = viewer.pngURI();
+    }, 60);
+  }
+  gif.on('finished', blob => {
+    document.getElementById('rec').style.display = 'none';
+    btn.disabled = false; status.textContent = '';
+    spinning = wasSpinning; if (wasSpinning) doSpin();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'GAO_1GOG_360.gif';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+  capture();
+}
+
+function startVideo() {
+  if (!viewer) return;
+  const canvas = document.getElementById('viewer').querySelector('canvas');
+  if (!canvas || !canvas.captureStream) { document.getElementById('status').textContent = 'Not supported in this browser.'; return; }
+  const wasSpinning = spinning; spinning = false;
+  const btn = document.getElementById('vidBtn');
+  const status = document.getElementById('status');
+  btn.disabled = true; status.textContent = 'recording 5s…';
+  document.getElementById('rec').style.display = 'block';
+
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  const rec = new MediaRecorder(canvas.captureStream(30), {mimeType: mime});
+  const chunks = [];
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = () => {
+    document.getElementById('rec').style.display = 'none';
+    btn.disabled = false; status.textContent = '';
+    spinning = wasSpinning; if (wasSpinning) doSpin();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(chunks, {type: mime}));
+    a.download = 'GAO_1GOG.webm';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+  rec.start();
+  let t = 0;
+  const loop = setInterval(() => {
+    viewer.rotate(2, 'y'); viewer.render(); t += 1000/30;
+    if (t >= 5000) { clearInterval(loop); rec.stop(); }
+  }, 1000/30);
+}
+
+fetch('1gog_backbone.pdb')
+  .then(r => r.text())
+  .then(pdb => {
+    document.getElementById('loading').style.display = 'none';
+    viewer = $3Dmol.createViewer(document.getElementById('viewer'), {backgroundColor:'#000000', backgroundAlpha:1});
+    viewer.addModel(pdb, 'pdb');
+    applyStyles();
+    viewer.zoomTo();
+    viewer.render();
+  })
+  .catch(e => { document.getElementById('loading').textContent = 'Error loading structure: ' + e.message; });
+</script>
+</body>
+</html>
